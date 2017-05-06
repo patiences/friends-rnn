@@ -33,6 +33,11 @@ def build_input_file():
 
 class RNN:
 
+    """
+    This code is adapted from Andrej Karpathy's minimal char-rnn model,
+    https://gist.github.com/karpathy/d4dee566867f8291f086
+    """
+
     def __init__(self, learning_rate=1e-1, hidden_layer_size=100, max_iter=200):
         """
         learning_rate: constant multiplied to gradient during param update.
