@@ -71,8 +71,8 @@ class RNN:
         self.Wxh = np.random.randn(self.hidden_layer_size, self.vocab_size) * 0.01
         self.Whh = np.random.randn(self.hidden_layer_size, self.hidden_layer_size) * 0.01
         self.Why = np.random.randn(self.vocab_size, self.hidden_layer_size) * 0.01
-        self.bias_h = np.zeros((self.hidden_layer_size, 1))         # hidden_layer_size by 1
-        self.bias_y = np.zeros((self.vocab_size, 1))                # vocab_size by 1
+        self.bias_h = np.zeros((self.hidden_layer_size, 1))            # hidden_layer_size by 1
+        self.bias_y = np.zeros((self.vocab_size, 1))                   # vocab_size by 1
 
         num_iter, current_char_idx = 0, 0
 
@@ -91,8 +91,8 @@ class RNN:
             Gxh, Ghh, Ghy, gbias_h, gbias_y = self._backpropagate(inputs, targets, X, H, y)
             self._update_params(Gxh, Ghh, Ghy, gbias_h, gbias_y)
 
-            current_char_idx += seq_length                     # move data pointer
-            num_iter += 1                                      # iteration counter
+            current_char_idx += seq_length
+            num_iter += 1
 
     def _forward_pass(self, inputs, targets, hidden_prev):
         """
@@ -100,9 +100,10 @@ class RNN:
         """
         seq_length = len(inputs)
 
-        X = np.zeros((seq_length, self.vocab_size))                 # Inputs, encoded as 1 of k
-        H = np.zeros((seq_length, self.hidden_layer_size))          # Hidden state
-        y = np.zeros((seq_length, self.vocab_size))                 # Outputs
+        X = np.zeros((seq_length, self.vocab_size, 1))                 # seq_length of vocab_size by 1 (column) vector inputs, encoded as 1 of k
+        H = np.zeros((seq_length, self.hidden_layer_size, 1))          # Hidden state
+        y = np.zeros((seq_length, self.vocab_size, 1))                 # Outputs
+        f = 0                                                          # initialize loss to 0
 
         for i in range(seq_length):
             char_idx = inputs[i] # Get back the (index representation of the) char
@@ -113,10 +114,12 @@ class RNN:
                 # h by v * v by 1
                 H[i] = np.tanh(np.dot(self.Wxh, X[i]) + np.dot(self.Whh, H[i-1]) + self.bias_h)      # Neuron in hidden layer, with tanh nonlinearity applied
             else:
+                #import pdb
+                #pdb.set_trace()
                 H[i] = np.tanh(np.dot(self.Wxh, X[i]) + np.dot(self.Whh, hidden_prev) + self.bias_h)  # Use hidden state from previous forward pass
 
             # P(y[i] | X[i], W)
-            y[i] = np.dot(self.Why, H[i]) + bias_y                                         # vocab_size by 1
+            y[i] = np.dot(self.Why, H[i]) + self.bias_y                                         # vocab_size by 1
 
             y[i] = np.exp(y[i]) / np.sum(np.exp(y[i]))                                     # softmax probability
 
@@ -139,7 +142,7 @@ class RNN:
             # Backprop from y into Why
             dyi = np.copy(y[i])                                          # Get softmax probabilities from forward pass
             dyi[targets[i]] -= 1                                         # Partial derivative is P(k | X[i], w) - (y[i] = k)
-            Ghy += np.dot(dyi, H[t].T)                                   # v by 1 * 1 by h
+            Ghy += np.dot(dyi, H[i].T)                                   # v by 1 * 1 by h -> v by h
             gbias_y += dyi
 
             dHi = np.dot(self.Why.T, dyi) + dHnext
