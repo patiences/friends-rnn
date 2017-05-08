@@ -11,8 +11,9 @@ def process_inputs():
     print('data/input.txt has %d characters, %d unique.' % (data_size, vocab_size))
 
     char_to_idx = { ch:i for i,ch in enumerate(uniq_chars) }
+    idx_to_char = { i:ch for i,ch in enumerate(uniq_chars) }
 
-    return data, data_size, vocab_size, char_to_idx
+    return data, data_size, vocab_size, char_to_idx, idx_to_char
 
 def build_input_file():
     """
@@ -53,7 +54,7 @@ class RNN:
         self.hidden_layer_size = hidden_layer_size
         self.max_iter = max_iter
 
-    def fit(self, data, vocab_size, char_to_idx, seq_length=25):
+    def fit(self, data, vocab_size, char_to_idx, idx_to_char, seq_length=25):
         """
         data: list of integers representing the input text
 
@@ -91,6 +92,15 @@ class RNN:
             Gxh, Ghh, Ghy, gbias_h, gbias_y = self._backpropagate(inputs, targets, X, H, y)
             self._update_params(Gxh, Ghh, Ghy, gbias_h, gbias_y)
 
+            # TODO progress updates, save checkpoints
+
+            # Make predictions
+            if num_iter % 50 == 0:
+                # Choose a random character as seed
+                seed = np.random.choice(range(self.vocab_size), p=y[0].ravel())
+                prediction_idxs = self.predict(seed, hidden_prev, 100)
+                print(''.join([idx_to_char[idx] for idx in prediction_idxs]))
+
             current_char_idx += seq_length
             num_iter += 1
 
@@ -114,8 +124,6 @@ class RNN:
                 # h by v * v by 1
                 H[i] = np.tanh(np.dot(self.Wxh, X[i]) + np.dot(self.Whh, H[i-1]) + self.bias_h)      # Neuron in hidden layer, with tanh nonlinearity applied
             else:
-                #import pdb
-                #pdb.set_trace()
                 H[i] = np.tanh(np.dot(self.Wxh, X[i]) + np.dot(self.Whh, hidden_prev) + self.bias_h)  # Use hidden state from previous forward pass
 
             # P(y[i] | X[i], W)
@@ -170,13 +178,45 @@ class RNN:
             mem = dparam**2
             param += - self.learning_rate * dparam / np.sqrt(mem + epsilon)
 
-    def predict(self):
-        pass
+    def predict(self, seed_idx, hidden_state, length):
+        """
+        Generate a sequence of characters (integers) using the model
+        at a specific point in training time.
+
+        seed_idx: a seed letter for the first character
+        hidden_state: a hidden state from the model (h by 1)
+        length: number of characters to generate
+        """
+        # the previous character, initialized with seed_idx
+        x_prev = np.zeros((self.vocab_size, 1))
+        x_prev[seed_idx] = 1
+
+        prediction_idxs = []
+
+        for c in range(length):
+            # Generate the next hidden state using this character
+            hidden_state = np.tanh(np.dot(self.Wxh, x_prev) + np.dot(self.Whh, hidden_state) + self.bias_h)
+
+            # Prediction vector
+            y = np.dot(self.Why, hidden_state) + self.bias_y
+            y = np.exp(y) / np.sum(np.exp(y))
+
+            # Predict a character, using the probability distribution y
+            idx = np.random.choice(range(self.vocab_size), p=y.ravel())
+            prediction_idxs.append(idx)
+
+            # reset previous character
+            x_prev = np.zeros((self.vocab_size, 1))
+            x_prev[idx] = 1
+
+        return prediction_idxs
 
 def main():
-    data, data_size, vocab_size, char_to_idx = process_inputs()
+    data, data_size, vocab_size, char_to_idx, idx_to_char = process_inputs()
     model = RNN()
-    model.fit(data=data, vocab_size=vocab_size, char_to_idx=char_to_idx)
+    model.fit(data=data, vocab_size=vocab_size, char_to_idx=char_to_idx, idx_to_char=idx_to_char)
+
+
 
 if __name__ == "__main__":
     main()
